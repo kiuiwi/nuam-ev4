@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<div>
+    <h1>NUAM - Sistema de Gestión</h1>
+</div>
+
+<br>
+
+
+<div class="Form">
+    <h2>Listado de Documentos</h2>
+
+    <hr>
+
+    <a href="{% url 'crear_documento' %}">crear nuevo documento</a>
+
+    <br><br>
+
+    <!-- 🔎 BUSCADOR -->
+    <form method="get">
+        <input type="text" name="q" placeholder="Buscar..." value="{{ query }}">
+        
+        <select name="tipo">
+            <option value="">-- Tipo --</option>
+            <option value="pdf" {% if tipo == "pdf" %}selected{% endif %}>PDF</option>
+            <option value="word" {% if tipo == "word" %}selected{% endif %}>Word</option>
+            <option value="excel" {% if tipo == "excel" %}selected{% endif %}>Excel</option>
+            <option value="imagen" {% if tipo == "imagen" %}selected{% endif %}>Imagen</option>
+        </select>
+
+        <button type="submit">Buscar</button>
+    </form>
+
+    <br>
+
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Usuario</th>
+            <th>Tipo</th>
+            <th>Archivo</th>
+            <th>Fecha Ingreso</th>
+            <th>Acciones</th>
+        </tr>
+
+        {% for doc in documentos %}
+        <tr>
+            <td>{{ doc.id_documento }}</td>
+            <td>{{ doc.documento_nombre }}</td>
+            <td>{{ doc.usuario }}</td>
+            <td>{{ doc.documento_tipo }}</td>
+            <td>
+                {% if doc.archivo %}
+                <a href="{{ doc.archivo.url }}" target="_blank">ver archivo</a>
+                {% else %}
+                Sin archivo
+                {% endif %}
+            </td>
+            <td>{{ doc.fecha_ingreso }}</td>
+            <td>
+                <a href="{% url 'editar_documento' doc.pk %}">editar</a> |
+                <a href="{% url 'eliminar_documento' doc.pk %}">eliminar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+
+{% endblock %}

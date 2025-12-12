@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div>
+    <h1>NUAM - Sistema de Gestión</h1>
+</div>
+
+<br>
+
+<div class="Form">
+    <h2>Eliminar Registro</h2>
+    <hr><br>
+    
+    <p>¿Seguro que quieres eliminar a <strong>{{ usuario.nombre_usuario }}</strong>?</p>
+    
+    <form method="POST">
+        {% csrf_token %}
+        <button class="btn" type="submit" style="background-color:rgb(255,66,1); color: white;">Sí, eliminar</button>
+    </form>
+    
+    <br>
+    <a href="{% url 'lista_registros' %}">Cancelar</a>
+    <br><br>
+</div>
+{% endblock %}

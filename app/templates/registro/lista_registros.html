@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div>
+    <h1>NUAM - Sistema de Gestión</h1>
+</div>
+
+<br>
+
+<div class="Form">
+    <h2>Listado de Registros</h2>
+    <hr>
+
+    <a href="{% url 'crear_registro' %}">Crear nuevo registro</a>
+    <br><br>
+
+    <table border="1">
+        <tr>
+            <th>Usuario</th>
+            <th>Nombre Completo</th>
+            <th>Correo</th>
+            <th>Acciones</th>
+        </tr>
+
+        {% for persona in personas %}
+        <tr>
+            <td>{{ persona.usuario.nombre_usuario }}</td>
+            <td>{{ persona.nombres }} {{ persona.apellidos }}</td>
+            <td>{{ persona.email }}</td>
+            <td>
+                <a href="{% url 'editar_registro' persona.usuario.id_usuario %}">Editar</a>
+                |
+                <a href="{% url 'eliminar_registro' persona.usuario.id_usuario %}">Eliminar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+
+
+</div>
+
+
+{% endblock %}
+

@@ -1,0 +1,26 @@
+
+#archivos compilados de Python
+*.pyc
+__pycache__/
+
+
+# IDEs
+.vscode/  
+
+
+# Virtual environments 
+venv/
+env/
+
+# Env files 
+*.env
+.env.*
+
+
+#Certificates
+*.key
+*.crt
+*.pem
+*.p12
+
+

@@ -1,0 +1,24 @@
+services:
+  indicadores_service:
+    build: ./microservicios/indicadores_service
+    ports:
+      - "3000:3000"
+
+  logs_service:
+    build: ./microservicios/log_service
+    ports:
+      - "3001:3001"
+
+  notifications_service:
+    build: ./microservicios/notification_service
+    ports:
+      - "3002:3002"
+
+  nuam_django:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - indicadores_service
+      - logs_service
+      - notifications_service

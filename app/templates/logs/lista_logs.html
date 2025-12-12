@@ -1,0 +1,99 @@
+<nav>
+    <a class="btn" href="{% url 'inicio' %}">Volver al Inicio</a>
+</nav>
+
+
+
+<h2>Eventos del sistema</h2>
+
+<style>
+    .log-row { font-size: 18px; }
+
+    /* Colores por tipo */
+    .tipo-usuario { color: orange; font-weight: bold; }
+    .tipo-documento { color: blue; font-weight: bold; }
+    .tipo-login { color: gray; font-weight: bold; }
+</style>
+
+<table id="logsTable" border="1" cellpadding="8">
+    <tr>
+        <th>Fecha</th>
+        <th>Tipo</th>
+        <th>Mensaje</th>
+    </tr>
+
+    {% for log in logs %}
+    <tr class="log-row">
+        <td>{{ log.fecha|date:"d/m/Y H:i:s" }}</td>
+        <td class="tipo-{{ log.tipo|lower }}">{{ log.tipo }}</td>
+        <td>{{ log.mensaje }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<script>
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleString("es-CL", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+}
+
+function cargarLogs() {
+    fetch("/api/logs/")
+        .then(res => res.json())
+        .then(data => {
+            const table = document.getElementById("logsTable");
+
+            let html = `
+                <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Mensaje</th>
+                </tr>
+            `;
+
+            data.forEach(log => {
+
+                /* ============================
+                   DETERMINAR COLOR POR TIPO
+                   ============================ */
+                let tipo = log.tipo.toLowerCase();
+                let tipoClass = "tipo-login"; // default gris
+
+                if (tipo.includes("usuario")) tipoClass = "tipo-usuario";
+                else if (tipo.includes("documento")) tipoClass = "tipo-documento";
+                else tipoClass = "tipo-login";
+
+                /* ============================
+                   DETERMINAR ICONO POR ACCIÓN
+                   ============================ */
+                let msg = log.mensaje.toLowerCase();
+                let icon = "⚪"; // default
+
+                if (msg.includes("creado") || msg.includes("inicio de sesión exitoso") || msg.includes("ingres"))
+                    icon = "🟢";
+                else if (msg.includes("editado"))
+                    icon = "🟠";
+                else if (msg.includes("eliminado") || msg.includes("fallido"))
+                    icon = "🔴";
+
+                html += `
+                    <tr class="log-row">
+                        <td>${formatDate(log.fecha)}</td>
+                        <td class="${tipoClass}">${icon} ${log.tipo}</td>
+                        <td>${log.mensaje}</td>
+                    </tr>
+                `;
+            });
+
+            table.innerHTML = html;
+        });
+}
+
+setInterval(cargarLogs, 3000);
+</script>

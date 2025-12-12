@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div>
+    <h1>NUAM - Sistema de Gestión</h1>
+</div>
+
+<br><br>
+
+
+<div class="Form">
+    <h2>Editar Documento</h2>
+
+    <hr>
+    <br>
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <br>
+
+        <button class="btn" type="submit" style="background-color:rgb(255,66,1); color: white;">Guardar cambios</button>
+    </form>
+
+    <br>
+
+    <a href="{% url 'lista_documentos' %}">Volver al listado</a>
+
+    <br><br><br>
+
+    {% endblock %}
+
+</div>
+

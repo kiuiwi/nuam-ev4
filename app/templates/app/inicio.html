@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% load static %}
+
+<div>
+  <h1 class="titulo" style="text-align:center;">Bienvenido a NUAM</h1>
+</div>
+<br>
+
+<div class="menu" style="text-align:center;">
+  {% if request.session.usuario_id %}
+    <h2>Hola, {{ persona.nombres }} {{ persona.apellidos }}</h2>
+    <br>
+    <a href="{% url 'logout' %}" class="btn" style="background:#c0392b;color: white">Cerrar sesión</a>
+  {% else %}
+    <a href="{% url 'login' %}" class="btn" style="background-color:rgb(255,66,1); color: white;">Iniciar sesión</a>
+  {% endif %}
+</div>
+
+<br><br>
+
+<div class="Form">
+  {% if error_api %}
+    <p style="color:red; text-align:center;"><strong>{{ error_api }}</strong></p>
+  {% endif %}
+
+  <h3>Indicadores Económicos</h3>
+  <hr>
+
+  <p><strong>TPM:</strong> {{ tpm_actual|default:"No disponible" }}</p>
+  <p><strong>CLP → PEN:</strong> {{ tc_clp_pen|default:"No disponible" }}</p>
+  <p><strong>CLP → COP:</strong> {{ tc_clp_cop|default:"No disponible" }}</p>
+  <p><strong>Dólar actual:</strong> {{ valor_dolar|default:"No disponible" }}</p>
+  <p><strong>UF actual:</strong> {{ valor_uf|default:"No disponible" }}</p>
+</div>
+
+<br><br>
+
+<h2 style="text-align:center;">Dashboard Económico</h2>
+<hr>
+
+<h3>Dólar últimos 10 días</h3>
+<canvas id="graf1" style="max-width:600px; margin:auto;"></canvas>
+
+<h3>Comparación CLP</h3>
+<canvas id="graf2" style="max-width:600px; margin:auto;"></canvas>
+
+<h3>UF y Dólar</h3>
+<canvas id="graf3" style="max-width:600px; margin:auto;"></canvas>
+
+<!-- Pasar datos de Django a JS -->
+{{ fechas|json_script:"fechas-data" }}
+{{ valores|json_script:"valores-data" }}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const fechas = JSON.parse(document.getElementById('fechas-data').textContent || '[]');
+const valores = JSON.parse(document.getElementById('valores-data').textContent || '[]');
+
+const tcClpPen = parseFloat("{{ tc_clp_pen|default:'0' }}");
+const tcClpCop = parseFloat("{{ tc_clp_cop|default:'0' }}");
+const valorDolar = parseFloat("{{ valor_dolar|default:'0' }}");
+const valorUf = parseFloat("{{ valor_uf|default:'0' }}");
+
+console.log("CLP → PEN:", tcClpPen);
+console.log("CLP → COP:", tcClpCop);
+
+// Gráfico 1: Dólar histórico
+new Chart(document.getElementById("graf1"), {
+    type: "line",
+    data: {
+        labels: fechas,
+        datasets: [{
+            label: "USD (CLP)",
+            data: valores,
+            borderWidth: 2,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: false } }
+    }
+});
+
+
+// Gráfico 2: CLP -> PEN vs CLP -> COP
+new Chart(document.getElementById("graf2"), {
+    type: "bar",
+    data: {
+        labels: ["Valores"], // una sola categoría horizontal
+        datasets: [
+            {
+                label: "CLP → PEN",
+                data: [tcClpPen],
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                borderColor: 'rgb(255, 99, 132)',
+                borderWidth: 2,
+                yAxisID: 'y1'
+            },
+            {
+                label: "CLP → COP",
+                data: [tcClpCop],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgb(54, 162, 235)',
+                borderWidth: 2,
+                yAxisID: 'y2'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y1: {
+                type: 'linear',
+                position: 'left',
+                beginAtZero: true
+            },
+            y2: {
+                type: 'linear',
+                position: 'right',
+                beginAtZero: true
+            },
+            x: {
+                barPercentage: 0.4,
+                categoryPercentage: 0.5
+            }
+        }
+    }
+});
+
+
+// Gráfico 3: UF vs Dólar
+new Chart(document.getElementById("graf3"), {
+    type: "bar",
+    data: {
+        labels: ["Valores"],
+        datasets: [
+            {
+                label: "Dólar",
+                data: [valorDolar],
+                backgroundColor: 'rgba(255, 206, 86, 0.5)',
+                borderColor: 'rgb(255, 206, 86)',
+                borderWidth: 2,
+                yAxisID: 'y1'
+            },
+            {
+                label: "UF",
+                data: [valorUf],
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgb(75, 192, 192)',
+                borderWidth: 2,
+                yAxisID: 'y2'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y1: {
+                type: 'linear',
+                position: 'left',
+                beginAtZero: true
+            },
+            y2: {
+                type: 'linear',
+                position: 'right',
+                beginAtZero: true
+            },
+            x: {
+                barPercentage: 0.5,
+                categoryPercentage: 0.5
+            }
+        }
+    }
+});
+
+
+</script>
+
+{% endblock %}
