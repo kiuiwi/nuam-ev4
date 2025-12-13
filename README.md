@@ -412,7 +412,7 @@ Notifications:  http://localhost:3002/notifications
 3\. Verificar que Pulsar está funcionando directamente:
 - Ver contenedores activos:
 
-Abre **otra terminal** y ejecuta:
+Abre **una segunda terminal** y ejecuta:
 
 ```
 docker ps
@@ -444,7 +444,7 @@ bin/pulsar-client produce persistent://public/default/test -m "Hola NUAM"
 
 <br>
 
-- El primer terminal debe mostrar:
+- La **segunda terminal** debe mostrar:
 
 ```
 ----- got message -----
