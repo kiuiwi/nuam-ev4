@@ -55,7 +55,7 @@ Devuelve:
 
 <br>
 
-Integración con Apache Pulsar:
+**Integración con Apache Pulsar:**
 
 Se conecta al broker Pulsar (pulsar://pulsar:6650)
 
@@ -155,11 +155,10 @@ Formato de salida:
 
 ```
 
-Notas:
-
-No guarda timestamps (no es auditoría).
-No persiste datos.
-Consume eventos vía Pulsar.
+*Notas:*
+*No guarda timestamps (no es auditoría).*
+*No persiste datos.*
+*Consume eventos vía Pulsar.*
 
 ---
 
@@ -170,7 +169,11 @@ Consume eventos vía Pulsar.
 Consulta el archivo Manual de Usuario.pdf incluido en el repositorio para obtener una guía completa sobre el manejo de la interfaz y funcionalidades del sistema.
 
 
-<br><br>
+<br>
+
+---
+
+<br>
 
 ### **🏗 Arquitectura General**
 
@@ -204,7 +207,11 @@ Consulta el archivo Manual de Usuario.pdf incluido en el repositorio para obtene
 ```
 
 
-<br><br>
+<br>
+
+---
+
+<br>
 
 ### **⚙️Tecnologías Utilizadas**
 ```
@@ -219,6 +226,10 @@ Consulta el archivo Manual de Usuario.pdf incluido en el repositorio para obtene
 | HTTPS                 | Certificados locales 					 |
 
 ```
+<br>
+
+---
+
 <br>
 
 ### **⚙️ Requisitos previos:**
@@ -299,6 +310,17 @@ pip3 install -r requirements.txt
 ```
 docker-compose up --build
 ```
+<br>
+
+Esto inicia:
+
+- Django
+- Indicadores Service
+- Logs Service
+- Notification Service
+- Pulsar (standalone)
+
+
 
 <br><br>
 
@@ -324,54 +346,7 @@ http://localhost:3001/logs
 Notificaciones: 
 http://localhost:3002/notifications
 
-
-
-#### 🔍 Verificación del sistema Pub/Sub
-
-Luego de jecutar:
-
-```
-docker-compose up --build
-```
 <br>
-
-1. Realizar acciones en la app:
-
-- Login
-- Crear usuario
-- Editar documento
-- Logout
-
-<br>
-
-2. Verificar consumidores:
-
-Logs:
-
-http://localhost:3001/logs
-
-
-Notifications:
-
-http://localhost:3002/notifications
-
-<br>
-
-3. Ver Pulsar activo:
-
-```
-docker ps
-```
-
-<br>
-
-4. Ver mensajes en consola del servicio indicadores:
-
-```
-[PULSAR INDICADORES] Inicio de sesión exitoso...
-```
-
-<br><br>
 
 ---
 
@@ -405,34 +380,87 @@ Contraseña: inacap123
 <br>
 
 ---
-<br>
-
-### **🔐 Certificados**
-
-**Certificados utilizados en el proyecto**:
-
-* Certificado: nuam.crt
-
-* Clave privada: nuam.key
-
-* Ubicación: Carpeta certificados/ dentro del proyecto.
-
-* Tipo: Auto-firmado (self-signed) para entorno de desarrollo.
-
-* Generación: Se creó con OpenSSL
-
-Nota: Este certificado no está emitido por una autoridad confiable, por lo que los navegadores mostrarán advertencias de seguridad.
 
 <br>
 
-**Archivos adicionales:**
+### 🔍 Verificación del sistema Pub/Sub
 
-* certificate.crt
+Luego de ejecutar:
 
-* private.key
+```
+docker-compose up --build
+```
+<br>
 
-* request.csr (solicitud de firma de certificado)
+1\. Realizar acciones en la app:
 
+- Login
+- Crear usuario
+- Editar documento
+- Logout
+
+<br>
+
+2\. Verificar consumidores via navegador:
+
+Logs:  http://localhost:3001/logs
+
+Notifications:  http://localhost:3002/notifications
+
+<br>
+
+3\. Verificar que Pulsar está funcionando directamente:
+- Ver contenedores activos:
+
+Abre **otra terminal** y ejecuta:
+
+```
+docker ps
+```
+
+*Debes ver algo como "nuam-pulsar-1" en ejecucion*
+
+<br>
+
+- Entrar al contenedor de Pulsar:
+
+```
+docker exec -it nuam-pulsar-1 /bin/bash
+```
+<br>
+
+- Abrir un consumidor de prueba:
+
+```
+bin/pulsar-client consume persistent://public/default/test -s test-sub -n 0
+```
+<br>
+
+- En una **tercera terminal**, enviar un mensaje de prueba:
+
+```
+bin/pulsar-client produce persistent://public/default/test -m "Hola NUAM"
+```
+
+<br>
+
+- El primer terminal debe mostrar:
+
+```
+----- got message -----
+content: Hola NUAM
+
+```
+
+*Esto confirma que el broker funciona correctamente y que los mensajes pueden ser consumidos y producidos de manera independiente a los microservicios.*
+
+<br>
+
+4\. Ver mensajes en consola del servicio indicadores:
+
+```
+[PULSAR INDICADORES] Inicio de sesión exitoso...
+```
 
 <br><br>
 
@@ -750,8 +778,43 @@ Los datos de indicadores económicos se consumen desde Django y se muestran en l
 ```
 
 
-<br><br>
+<br>
 
+---
+<br>
+
+### **🔐 Certificados**
+
+**Certificados utilizados en el proyecto**:
+
+* Certificado: nuam.crt
+
+* Clave privada: nuam.key
+
+* Ubicación: Carpeta certificados/ dentro del proyecto.
+
+* Tipo: Auto-firmado (self-signed) para entorno de desarrollo.
+
+* Generación: Se creó con OpenSSL
+
+Nota: Este certificado no está emitido por una autoridad confiable, por lo que los navegadores mostrarán advertencias de seguridad.
+
+<br>
+
+**Archivos adicionales:**
+
+* certificate.crt
+
+* private.key
+
+* request.csr (solicitud de firma de certificado)
+
+
+<br>
+
+---
+
+<br>
 
 ### **🗂 Estructura de Modelos (Modelo de Datos)**
 
