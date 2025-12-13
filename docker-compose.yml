@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   indicadores_service:
     build: ./microservicios/indicadores_service
@@ -13,6 +15,19 @@ services:
     build: ./microservicios/notification_service
     ports:
       - "3002:3002"
+    depends_on:
+      - pulsar
+    environment:
+      - PULSAR_URL=pulsar://pulsar:6650
+
+  pulsar:
+    image: apachepulsar/pulsar:3.1.0
+    command: ["/pulsar/bin/pulsar", "standalone", "--no-functions-worker"]
+    ports:
+      - "6650:6650"
+      - "8080:8080"
+    volumes:
+      - pulsar_data:/pulsar/data
 
   nuam_django:
     build: .
@@ -22,3 +37,10 @@ services:
       - indicadores_service
       - logs_service
       - notifications_service
+    environment:
+      - MICROSERVICES__indicadores=http://indicadores_service:3000
+      - MICROSERVICES__logs=http://logs_service:3001
+      - MICROSERVICES__notificaciones=http://notifications_service:3002
+
+volumes:
+  pulsar_data:

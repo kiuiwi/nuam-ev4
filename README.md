@@ -10,16 +10,162 @@
 * CRUD de Personas asociadas
 * CRUD de Documentos (con subida de archivos)
 * Sistema de Login con roles (Administrador / Usuario)
-* Registro detallado de eventos
+* Registro detallado de eventos de negocio
+* Mensajería asíncrona mediante Apache Pulsar (Pub/Sub)
 * Envío de eventos en tiempo real mediante Apache Pulsar
+* Microservicios desacoplados
 * API REST completa mediante Django REST Framework
 * Visualización de indicadores económicos (API mindicador.cl)
 * Soporte para HTTPS local mediante certificado generado
 * Este proyecto está desarrollado en Django, sin base de datos externa adicional (solo modelo Django).
 
+El proyecto está desarrollado en Django + Flask, con Apache Pulsar como broker de eventos, siguiendo principios de microservicios y auditoría.
+
+<br>
+
+---
+
+### 🐳 Microservicios
+
+El proyecto NUAM incluye tres microservicios implementados en Flask. Dos de ellos consumen eventos de Apache Pulsar.
+
+### 1️⃣ Microservicio de Indicadores Económicos (indicadores_service)
+
+Puerto: 3000
+
+Funcionalidad: Consume múltiples APIs externas de forma síncrona, específicamente mindicador.cl para indicadores financieros de Chile y Exchange Rate API (open.er-api.com) para obtener tasas de cambio internacionales, combinando ambas fuentes para calcular conversiones monetarias adicionales.para obtener indicadores económicos y exponerlos vía HTTP.
+Adicionalmente, el servicio se integra a Apache Pulsar como consumidor, escuchando eventos del sistema de forma asíncrona para fines de monitoreo y extensibilidad.
+
+<br>
+
+Endpoints:
+
+GET /indicadores
+
+<br>
+
+Devuelve:
+
+* dolar: valor actual del dólar
+* uf: valor actual de la UF
+* tpm: Tasa de Política Monetaria
+* clp_pen: conversión CLP → PEN
+* clp_cop: conversión CLP → COP
+* historico_dolar: últimos 10 días del dólar
+
+<br>
+
+Integración con Apache Pulsar:
+
+Se conecta al broker Pulsar (pulsar://pulsar:6650)
+
+Se suscribe al tópico:
+```
+
+persistent://public/default/indicadores
+```
+
+* Consume mensajes de manera continua en un hilo independiente
+* Los eventos recibidos se procesan actualmente mediante salida por consola
+* Esta integración permite reaccionar a eventos del sistema sin acoplar el servicio al backend principal
+
+<br>
+
+*Notas:*
+
+* *La funcionalidad principal del servicio es síncrona (consulta HTTP).*
+* *La integración con Pulsar es asíncrona, orientada a eventos.*
+* *Actualmente el consumer no modifica el estado del servicio, pero habilita:*
+
+	* *monitoreo*
+	* *trazabilidad*
+	* *ampliación futura (caché, alertas, métricas)*
+
+<br>
+
+### 2️⃣ Microservicio de Logs (logs_service)
+
+Puerto: 3001
+
+Rol arquitectónico: Auditoría y trazabilidad.
+
+Funcionalidad:
+
+* Consume eventos desde Apache Pulsar (suscriptor).
+* Registra acciones reales del sistema.
+* Expone los logs vía API REST.
+
+Eventos procesados:
+* Login exitoso / fallido
+* Logout
+* Creación, edición y eliminación de usuarios
+* Creación, edición y eliminación de documentos
+
+<br>
+
+Endpoints:
+
+GET /logs → Devuelve todos los eventos registrados
+
+<br>
+
+Formato de salida:
+
+```
+{
+  "fecha": "2025-12-12T22:58:28",
+  "mensaje": "Inicio de sesión exitoso: inacap (ID 7)"
+}
+```
+
+*Notas:*
+*Los logs se almacenan en memoria.*
+*No interactúa directamente con Django.*
+*Consume eventos vía Pulsar (modelo Pub/Sub).*
+
+<br>
+
+### 3️⃣ Microservicio de Notificaciones (notifications_service)
+
+Puerto: 3002
+
+Rol arquitectónico: Canal de alertas.
+
+Funcionalidad:
+
+* Consume los mismos eventos desde Apache Pulsar.
+* Transforma eventos en notificaciones.
+* Asocia cada notificación a un usuario (ej: admin).
+
+<br> 
+
+**Endpoints:**
+
+GET /notifications
+
+<br>
+
+Formato de salida:
+
+```
+{
+  "mensaje": "Documento editado: Informe Septiembre",
+  "usuario": "admin"
+}
+
+```
+
+Notas:
+
+No guarda timestamps (no es auditoría).
+No persiste datos.
+Consume eventos vía Pulsar.
+
+---
+
 <br><br>
 
-📖 **Manual de Usuario**
+### 📖 **Manual de Usuario**
 
 Consulta el archivo Manual de Usuario.pdf incluido en el repositorio para obtener una guía completa sobre el manejo de la interfaz y funcionalidades del sistema.
 
@@ -29,59 +175,51 @@ Consulta el archivo Manual de Usuario.pdf incluido en el repositorio para obtene
 ### **🏗 Arquitectura General**
 
 ```
-┌──────────────────────────┐
-│        Usuario           │
-└───────────────┬──────────┘
-		│
-		 Peticiones HTTPS
-		│
-┌───────────────▼──────────────┐
-│            Django            │
-│ - CRUD Usuarios/Personas     │
-│ - CRUD Documentos            │
-│ - Login y Roles              │
-│ - API REST                   │
-└───────────────┬──────────────┘
-		│
-		 publish\\\_event() (Producer)
-		│
-┌───────────────▼──────────────┐
-│       Apache Pulsar          │
-│        (Docker)              │
-└───────────────┬──────────────┘
-		│
-
-    	   Consumer.py        
-    	Guarda logs en BD     
+                    ┌────────────────────┐
+                    │       Django       │
+                    │ API + Auth + CRUD  │
+                    │  (Publisher)       │
+                    └─────────┬──────────┘
+                              │ Eventos
+                              ▼
+                    ┌────────────────────┐
+                    │   Apache Pulsar    │
+                    │   Broker Pub/Sub   │
+                    │   6650 / 8080      │
+                    └─────────┬──────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+          ▼                   ▼                   ▼
+┌────────────────┐   ┌────────────────┐   ┌─────────────────────┐
+│ Logs Service   │   │ Notifications  │   │ Indicadores Service │
+│ :3001          │   │ Service :3002  │   │ :3000               │
+│ Auditoría      │   │ Alertas        │   │ Indicadores + APIs  │
+└────────────────┘   └────────────────┘   └─────────┬───────────┘
+                                                      │
+                                     ┌────────────────┼────────────────┐
+                                     ▼                ▼                ▼
+                               mindicador.cl    open.er-api.com   (externas)
 
 ```
+
 
 <br><br>
 
 ### **⚙️Tecnologías Utilizadas**
 ```
-| Tecnología            | Uso                                   |
-
+| Tecnología            | Uso                                    |
 |-----------------------|----------------------------------------|
-
 | Python 3.12           | Lenguaje principal                     |
-
 | Django 5              | Backend, views, modelos, sesiones      |
-
 | Django REST Framework | API REST                               |
-
-| Apache Pulsar         | Mensajería en tiempo real              |
-
-| Docker                | Contenedor de Pulsar                   |
-
+| Apache Pulsar         | Broker Pub/Sub         			     |
+| Docker                | Contenedores           		         |
 | Bootstrap             | Estilos del frontend                   |
-
-| HTTPS                 | Certificados locales (cert.pem, key.pem) |
-
-| API mindicador.cl     | Datos económicos actualizados          |
+| HTTPS                 | Certificados locales 					 |
 
 ```
-<br><br>
+<br>
 
 ### **⚙️ Requisitos previos:**
 
@@ -108,19 +246,18 @@ Consulta el archivo Manual de Usuario.pdf incluido en el repositorio para obtene
 2\. Abre una terminal y accede a la carpeta creada, luego ejecuta:
 
 ```
-git clone https://github.com/camly01/nuam
+git clone https://github.com/kiuiwi/nuam-ev4.git
 ```
 
 ```
-cd nuam
+cd nuam-ev4
 ```
 
 <br>
 
 3\. Crear y activar entorno virtual (venv):
 
-Desde la misma carpeta del proyecto "nuam", ejecuta:
-
+Desde la misma carpeta del proyecto "nuam-ev4", ejecuta:
 
 
 Windows:
@@ -150,115 +287,93 @@ py -m pip install -r requirements.txt
 ```
 
 
-
 Linux:
 ```
 pip3 install -r requirements.txt
 ```
+<br>
 
 
+5\. Construir y levantar los microservicios con Docker:
+
+```
+docker-compose up --build
+```
 
 <br><br>
 
+6\. Acceder a los servicios:
 
-### **🐳 Levantamiento de Apache Pulsar con Docker**
+Dashboard principal: 
+http://localhost:8000
 
 
-1\. Instalar Docker
 
-Instala según tu sistema operativo:
-
-* Windows / Mac: Docker Desktop
-* Linux: Docker Engine
-
-(en Windows abre Docker Desktop y asegúrate de que esté ejecutándose.
+*Nota: Si los indicadores no aparecen, recargue la página.*
 
 <br>
 
+**Microservicios:**
 
-2\. Crear contenedor Pulsar (solo la primera vez):
+Indicadores: 
+http://localhost:3000/indicadores
 
-(Abre una terminal)
+Logs: 
+http://localhost:3001/logs
+
+Notificaciones: 
+http://localhost:3002/notifications
 
 
-Windows/Linux:
+
+#### 🔍 Verificación del sistema Pub/Sub
+
+Luego de jecutar:
 
 ```
-docker run -d --name pulsar-standalone -p 6650:6650 -p 8080:8080 apachepulsar/pulsar:latest bin/pulsar standalone
+docker-compose up --build
 ```
+<br>
 
+1. Realizar acciones en la app:
 
-
-🚨Si el contenedor aparece como "Exited", eliminarlo:
-
-```
-docker rm pulsar-standalone
-```
-
-Y volver a ejecutar el comando anterior (paso 2).
+- Login
+- Crear usuario
+- Editar documento
+- Logout
 
 <br>
 
+2. Verificar consumidores:
 
-4\. Verificar contenedor
+Logs:
 
-Listar contenedores:
-
-```
-docker ps -a
-```
-
-Si está apagado:
-
-```
-docker start pulsar-standalone
-```
+http://localhost:3001/logs
 
 
+Notifications:
 
-Verificar:
+http://localhost:3002/notifications
+
+<br>
+
+3. Ver Pulsar activo:
 
 ```
 docker ps
 ```
 
-
-
-(debe mostrar "	Up")
-
-
-
-
-
-(aquí ya se puede correr Django)
-
-
 <br>
 
+4. Ver mensajes en consola del servicio indicadores:
 
-### **🐊 Levantar Django**
-
-
-
-en otra terminal, dentro de la carpeta nuam, ejecuta
-
-Windows:
 ```
-py manage.py runserver
+[PULSAR INDICADORES] Inicio de sesión exitoso...
 ```
-
-
-Linux/Mac:
-```
-python3 manage.py runserver
-```
-
-<br>
-
-🔌 **Puerto por defecto:**   El servidor se levanta en:  http://localhost:8000  
 
 <br><br>
 
+---
 
 ### **👤 Login**
 
@@ -287,87 +402,10 @@ Usuario: inacap
 Contraseña: inacap123
 
 
-<br><br>
-
-**🐳 Ejecutar Consumidor:**
-
-En otra terminal, corre:
-
-```
-python consumer.py
-```
-
-
-Debe ejecutarse en otra terminal para no detener el servidor Django.
-
-Los mensajes enviados desde publish_event() aparecerán en consola y en la base de datos.
-
 <br>
 
-Explicación: escucha el topic eventos-nuam y guarda eventos en Django (EventoLog)
-
-Los mensajes se guardan en la tabla EventoLog.
-
-Puedes verlos desde tu admin de Django (/admin) o con python manage.py shell:
-
-
-
-<br><br>
-
-
-**🐳 Verificar mensajes manuales en Pulsar**
-
-En una terminal distinta a donde se esté ejecutando consumer.py, ejecuta:
-
-
-```
-docker exec -it pulsar-standalone bin/pulsar-client consume -s prueba1 -n 0 persistent://public/default/eventos-nuam
-```
-
-
--s prueba1  →  nombre de la suscripción
-
--n 0  →  consume todos los mensajes del topic
-
-persistent://public/default/eventos-nuam  →  topic
-
-
-
+---
 <br>
-
-**Salida esperada:**
-
-"Subscribed to topic on localhost/127.0.0.1:6650 -- consumer: 0"
-
-Indica que el consumidor está escuchando correctamente.
-
-<br>
-
-
-**Productor: pulsar_client.py:**
-
-* Se conecta al broker de Pulsar que corre en localhost:6650.
-Crea un productor para el topic eventos-nuam.
-La función publish_event(data) toma un string data y lo envía al topic.
-
-* Cada vez que llames a publish_event("mensaje"), ese mensaje se envía a Pulsar.
-
-<br>
-
-
-**Consumidor: consumer.py:**
-
-* Configura Django para poder usar tus modelos (EventoLog).
-* Se conecta a Pulsar y se suscribe al mismo topic eventos-nuam.
-* Entra en un bucle infinito, escuchando mensajes.
-* Cada vez que llega un mensaje:
-* Lo imprime en consola (print("EVENTO RECIBIDO:", contenido)).
-* Lo guarda en tu base de datos Django como un nuevo EventoLog.
-* Confirma a Pulsar que el mensaje fue recibido (acknowledge).
-
-
-
-<br><br>
 
 ### **🔐 Certificados**
 
@@ -399,59 +437,47 @@ Nota: Este certificado no está emitido por una autoridad confiable, por lo que 
 <br><br>
 
 
-### **🔐 HTTPS**
-
-Para levantar el servidor de Django usando HTTPS, se utiliza el comando:
-
-
-Windows:
-```
-python manage.py runserver_plus --cert-file certificados/nuam.crt --key-file certificados/nuam.key
-```
-
-
-Linux / Mac:
-```
-python3 manage.py runserver_plus --cert-file certificados/nuam.crt --key-file certificados/nuam.key
-```
-
-
-
-Esto levanta el servidor en https://127.0.0.1:8000/.
-
-
-Se recomienda usar Chrome o Firefox para pruebas; ambos mostrarán advertencias debido al certificado auto-firmado.
-
-
-El comando utiliza django-extensions (runserver_plus) para habilitar HTTPS en desarrollo.
-
-<br>
-
 ---
 
 <br><br>
 
-### **📡 Sistema de Logs + Pulsar**
+### 📡 Sistema de Logs + Apache Pulsar (Pub/Sub)
 
-Cada acción del sistema genera un evento:
+📤 Publicación de eventos (Publisher)
 
-* Login correcto
-* Login fallido
-* Crear usuario
-* Editar usuario
-* Eliminar usuario
-* Crear documento
-* Editar documento
-* Eliminar documento
-* Cierre de sesión
+Django actúa como productor de eventos, publicando mensajes en Apache Pulsar cada vez que ocurre una acción de negocio relevante dentro del sistema.
 
-<br>
+La publicación de eventos se realiza mediante la función publish_event(), ubicada en:
 
-1\. Envían a Pulsar (publish\_event())
+utils/pulsar_client.py
 
-2\. El consumer.py los escucha
 
-3\. Se guardan en EventoLog en la base de datos
+Cada evento representa una acción real del sistema y se envía al broker Pulsar siguiendo el modelo Publish/Subscribe, permitiendo que múltiples servicios reaccionen de forma desacoplada.
+
+Eventos publicados por Django:
+
+- Login exitoso
+- Login fallido
+- Cierre de sesión (Logout)
+- Creación de usuarios
+- Edición de usuarios
+- Eliminación de usuarios
+- Creación de documentos
+- Edición de documentos
+- Eliminación de documentos
+
+
+#### Flujo de eventos:
+
+1. Django publica el evento en Apache Pulsar (publish_event()).
+
+2. Apache Pulsar distribuye el mensaje a los consumidores suscritos.
+
+3. Los microservicios consumidores procesan el evento según su responsabilidad:
+
+	- logs_service: registra auditoría.
+	- notifications_service: genera notificaciones.
+	- indicadores_service: escucha eventos para monitoreo/extensibilidad.
 
 
 <br><br>
@@ -517,55 +543,94 @@ http://localhost:8000/swagger/
 
 
 
-### **🌐 Integración con API Externa (mindicador.cl)**
+### **🌐 Integración con APIs Externas Indicadores Económicos**
+
+
+El sistema integra APIs públicas externas a través del microservicio independiente Indicadores Service, encargado de centralizar la consulta de datos económicos y exponerlos al resto del sistema de forma síncrona.
+
+Django no consume APIs externas directamente, sino que obtiene los datos mediante una llamada HTTP al microservicio, manteniendo una arquitectura desacoplada y escalable.
 
 
 
-Esta función obtiene indicadores económicos desde la API pública de Mindicador,
+### 1️⃣ mindicador.cl (Chile)
+Fuente oficial de indicadores económicos nacionales.
 
-como la TPM (Tasa Política Monetaria) y tasas de conversión.
+Se utiliza para obtener:
 
-La función obtener\_indicadores() consulta:
+* Dólar (CLP)
+* UF
+* TPM (Tasa de Política Monetaria)
+* Serie histórica del dólar
 
-TPM actual
+### 2️⃣ open.er-api.com (Exchange Rate API)
+Servicio público de tasas de cambio internacionales.
 
-Tipo de cambio CLP → PEN
+Se utiliza para obtener:
 
-Tipo de cambio CLP → COP
+* Conversión USD → PEN
+* Conversión USD → COP
 
-<br>
+Cálculo derivado:
 
-**Se maneja:**
-
-Timeout
-
-Errores de conexión
-
-Datos faltantes
-
-<br>
-
-**Los valores se muestran en:**
-
-inicio.html
-
-menu_admin.html
-
-menu_usuario.html
-
-login.html
+* CLP → PEN
+* CLP → COP
 
 <br>
 
-**Salida de la función:**
+**Microservicio responsable:**
 
-tpm_actual:	Valor de la TPM actual.
+Indicadores Service
+Puerto: 3000
 
-tc_clp_pen:	Tipo de cambio CLP → PEN calculado.
+Función principal:
 
-tc_clp_cop:	Tipo de cambio CLP → COP calculado.
+* Consultar APIs externas
+* Normalizar los datos
+* Exponerlos mediante un endpoint HTTP
 
-error_api: 	Mensaje de error si falla la consulta.
+<br>
+
+Endpoint expuesto:
+
+GET /indicadores
+
+<br>
+
+Datos entregados
+
+* dolar: Valor actual del dólar en CLP
+* uf: Valor actual de la UF
+* tpm: Tasa de Política Monetaria
+* clp_pen: Conversión CLP → PEN
+* clp_cop: Conversión CLP → COP
+* historico_dolar: Últimos 10 registros del dólar
+
+<br>
+
+#### Manejo de errores y resiliencia
+
+El microservicio implementa:
+
+- Timeout en llamadas HTTP externas
+
+- Manejo de errores de conexión
+
+- Validación de datos faltantes
+
+- Fallback de histórico del dólar en caso de indisponibilidad
+
+Esto evita que una falla externa afecte la disponibilidad del sistema principal.
+
+<br>
+
+#### Visualización en la aplicación:
+
+Los datos de indicadores económicos se consumen desde Django y se muestran en las siguientes vistas:
+
+- inicio.html
+- menu_admin.html
+- menu_usuario.html
+- login.html
 
 
 
@@ -581,134 +646,107 @@ error_api: 	Mensaje de error si falla la consulta.
 /nuam.
 
 |
-
 ├── app
-
 │   ├── admin.py
-
 │   ├── api\_views.py
-
 │   ├── apps.py
-
 │   ├── forms.py
-
 │   ├── models.py
-
 │   ├── serializers.py
-
+│   │ 
 │   ├── static
-
 │   │   └── app
-
 │   │       ├── nuam\_HD2.png
-
 │   │       ├── nuam\_HD.png
-
 │   │       └── styles.css
-
+│   │ 
 │   ├── templates
-
 │   │   ├── app
-
 │   │   │   ├── inicio.html
-
 │   │   │   ├── login.html
-
 │   │   │   ├── menu\_admin.html
-
 │   │   │   └── menu\_usuario.html
-
+│   │   │
 │   │   ├── base.html
-
+│   │   │
 │   │   ├── documentos
-
+│   │   │
 │   │   │   ├── crear\_documento.html
-
 │   │   │   ├── editar\_documento.html
-
 │   │   │   ├── eliminar\_documento.html
-
 │   │   │   └── lista\_documentos.html
-
+│   │   │
 │   │   ├── logs
-
 │   │   │   └── lista\_logs.html
-
+│   │   │
 │   │   ├── registro
-
 │   │   │   ├── crear\_registro.html
-
 │   │   │   ├── editar\_registro.html
-
 │   │   │   ├── eliminar\_registro.html
-
 │   │   │   └── lista\_registros.html
-
+│   │   │
+│   │   └── usuarios
+│   │       ├── crear\_usuario.html
+│   │       ├── eliminar\_usuario.html
+│   │       └── lista\_usuarios.html
+│   │  
 │   ├── tests.py
-
 │   ├── urls.py
-
 │   └── views.py
-
 │
-
 ├── certificados
-
 │   ├── cert.crt
-
 │   ├── certificate.crt
-
 │   ├── cert.key
-
 │   ├── nuam.crt
-
 │   ├── nuam.key
-
 │   ├── private.key
-
 │   └── request.csr
-
+│     
+│   
+├── microservicios
+│   ├── indicadores_service
+│   │       ├── Dockerfile
+│   │       ├── main.py
+│   │       └── requirements.txt
+│   │  
+│   ├── log_service
+│   │       ├── Dockerfile
+│   │       ├── main.py
+│   │       └── requirements.txt
+│   │  
+│   └── notification_service
+│           ├── Dockerfile
+│           ├── main.py
+│           └── requirements.txt
+│     
 │
-
 ├── consumer.py
-
 │
-
 ├── db.sqlite3
-
 │
-
 ├── documentos
-
 │   └── comprobante\_depositos.txt
-
 │
-
 ├── manage.py
-
 │
-
+├── docker-compose.yml
+│
+├── Dockerfile
+│
+│
 ├── nuam
-
 │   ├── asgi.py
-
 │   ├── settings.py
-
 │   ├── urls.py
-
 │   └── wsgi.py
-
 │
-
 ├── README.txt
-
 ├── requirements.txt
-
 │
-
 └── utils
-
-    └── pulsar\_client.py
+    ├── pulsar_client.py
+    └── services_client.py
 ```
 
 
@@ -745,11 +783,8 @@ Usuario 1 ──── N Documento
 **👥 CRUD de Usuarios y Personas**
 
 * Crear
-
 * Editar
-
 * Eliminar
-
 * Listar
 
 <br>
@@ -757,9 +792,7 @@ Usuario 1 ──── N Documento
 **Al crear o editar un usuario:**
 
 * Se guarda el usuario con su Persona asociada.
-
-* Se genera un evento Pulsar (publish\_event()).
-
+* Se genera un evento Pulsar (publish_event()).
 * Se registra un EventoLog en la base de datos.
 
 <br>
@@ -767,15 +800,10 @@ Usuario 1 ──── N Documento
 **Flujo de creación**
 
 * Usuario + Persona enviados por POST
-
 * Validación de formularios
-
 * Guardado en DB
-
 * Pulsar produce evento
-
 * EventoLog guarda en DB
-
 * Redirige a la lista
 
 <br>
@@ -783,11 +811,8 @@ Usuario 1 ──── N Documento
 **Vistas incluidas:**
 
 * lista_registros
-
 * crear_registro
-
 * editar_registro
-
 * eliminar_registro
 
 
@@ -801,25 +826,19 @@ Usuario 1 ──── N Documento
 Funcionalidades:
 
 * Subir archivo (request.FILES)
-
 * Editar metadatos
-
 * Eliminar documento
-
 * Filtros (texto y tipo)
-
 * Logs + eventos Pulsar
 
 <br><br>
 
 **Vistas:**
 
-* lista\_documentos
-
-* crear\_documento
-
-* editar\_documento
-* eliminar\_documento
+* lista_documentos
+* crear_documento
+* editar_documento
+* eliminar_documento
 
 <br>
 
@@ -853,8 +872,8 @@ Usuario → acceso a menú usuario
 
 **Ambos almacenados en:**
 
-request.session\["tipo"]
-request.session\["usuario\_id"]
+request.session["tipo"]
+request.session["usuario_id"]
 
 
 <br><br>
