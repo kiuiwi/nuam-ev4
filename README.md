@@ -307,6 +307,8 @@ pip3 install -r requirements.txt
 
 5\. Construir y levantar los microservicios con Docker:
 
+(en Windows abre Docker Desktop y asegúrate de que esté ejecutándose.)
+
 ```
 docker-compose up --build
 ```
@@ -387,9 +389,8 @@ Contraseña: inacap123
 
 Luego de ejecutar:
 
-```
 docker-compose up --build
-```
+
 <br>
 
 1\. Realizar acciones en la app:
@@ -415,18 +416,25 @@ Notifications:  http://localhost:3002/notifications
 Abre **una segunda terminal** y ejecuta:
 
 ```
+cd nuam-ev4
+```
+
+```
 docker ps
 ```
 
-*Debes ver algo como "nuam-pulsar-1" en ejecucion*
+*Debes ver algo como "nuam-ev4-pulsar1" en ejecucion* 
 
 <br>
 
 - Entrar al contenedor de Pulsar:
 
 ```
-docker exec -it nuam-pulsar-1 /bin/bash
+docker exec -it nuam-ev4-pulsar-1 /bin/bash
 ```
+
+
+
 <br>
 
 - Abrir un consumidor de prueba:
@@ -439,7 +447,12 @@ bin/pulsar-client consume persistent://public/default/test -s test-sub -n 0
 - En una **tercera terminal**, enviar un mensaje de prueba:
 
 ```
-bin/pulsar-client produce persistent://public/default/test -m "Hola NUAM"
+cd nuam-ev4
+```
+
+```
+docker exec -it nuam-ev4-pulsar-1 /pulsar/bin/pulsar-client produce persistent://public/default/test  -m "Hola NUAM"
+
 ```
 
 <br>
