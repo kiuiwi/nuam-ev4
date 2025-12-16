@@ -475,14 +475,13 @@ content: Hola NUAM
 [PULSAR INDICADORES] Inicio de sesión exitoso...
 ```
 
-<br><br>
-
+<br> <br>
 
 ---
 
-<br><br>
+<br>
 
-### 📡 Sistema de Logs + Apache Pulsar (Pub/Sub)
+### 📡 **Sistema de Logs + Apache Pulsar (Pub/Sub)**
 
 📤 Publicación de eventos (Publisher)
 
@@ -523,6 +522,141 @@ Eventos publicados por Django:
 
 <br><br>
 
+---
+
+<br>
+
+### 🔐 **Configuración Opcional de Apache + HTTPS (ProxyPass)**
+
+Este proyecto puede ejecutarse directamente con Docker sin configuración adicional.
+Sin embargo, de forma opcional, es posible configurar Apache2 como proxy reverso con HTTPS para simular un entorno más cercano a producción.
+
+⚠️ *Esta configuración es opcional y solo aplica para sistemas Linux.*
+*En Windows, el proyecto funciona correctamente usando Docker y localhost sin Apache.*
+
+<br>
+
+### Arquitectura con Apache (opcional)
+
+```
+Cliente (Browser)
+        |
+     HTTPS (443)
+        |
+     Apache2
+   (ProxyPass)
+        |
+     HTTP (8000)
+        |
+     Django + Microservicios (Docker)
+        |
+     Apache Pulsar (Pub/Sub)
+```
+
+Apache actúa como proxy reverso, redirigiendo tráfico HTTPS hacia el backend Django que se ejecuta dentro de Docker.
+
+<br>
+
+### ⚙️ Requisitos (solo Linux)
+
+- Apache2
+
+- Módulos habilitados:
+
+  - ssl
+
+  - proxy
+
+  - proxy_http
+
+
+<br>
+
+### Instalación:
+
+```
+sudo apt update
+```
+
+```
+sudo apt install apache2
+```
+
+
+### Habilitar módulos:
+
+```
+sudo a2enmod ssl
+```
+
+```
+sudo a2enmod proxy
+```
+
+```
+sudo a2enmod proxy_http
+```
+
+<br>
+
+### 🛠️ Configuración de Apache
+
+1\. Crear el archivo de configuración SSL:
+
+```
+sudo nano /etc/apache2/sites-available/nuam-ssl.conf
+```
+
+<br>
+
+2\. Agregar la siguiente configuración:
+
+```
+<VirtualHost *:443>
+    ServerName localhost
+
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/ssl-cert-snakeoil.pem
+    SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:8000/
+    ProxyPassReverse / http://localhost:8000/
+
+    ErrorLog ${APACHE_LOG_DIR}/nuam-error.log
+    CustomLog ${APACHE_LOG_DIR}/nuam-access.log combined
+</VirtualHost>
+```
+
+Guardar el archivo
+
+<br>
+
+3\. Habilitar el sitio y reiniciar Apache:
+
+```
+sudo a2ensite nuam-ssl.conf
+```
+
+```
+sudo apachectl configtest
+```
+
+```
+sudo systemctl restart apache2
+```
+
+<br>
+
+### 🌐 Acceso con HTTPS
+
+Una vez configurado Apache, el sistema queda disponible en:
+
+https://localhost
+
+<br><br>
+
+---
 
 ### **🌐 API REST (Django REST Framework)**
 
